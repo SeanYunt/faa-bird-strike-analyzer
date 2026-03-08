@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+*.egg-info/
+
+# Raw and preprocessed data (too large / not redistributable)
+data/raw/
+data/preprocessed/
+
+# Generated output
+output/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+*.swp
