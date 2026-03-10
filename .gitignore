@@ -5,9 +5,8 @@ __pycache__/
 .venv/
 *.egg-info/
 
-# Raw and preprocessed data (too large / not redistributable)
+# Raw data (too large / not redistributable)
 data/raw/
-data/preprocessed/
 
 # Generated output
 output/

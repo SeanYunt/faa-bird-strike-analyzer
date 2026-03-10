@@ -27,6 +27,26 @@ python cli.py top --top 20
 python cli.py profile JFK
 ```
 
+## Sample Outputs
+
+**National strike map** — bubble size = total strikes, color = damage rate
+
+![National strike map](docs/screenshots/map_national.png)
+
+**Migration flyway overlay** — strikes grouped by the four North American flyway corridors
+
+![Flyway map](docs/screenshots/map_flyways.png)
+
+**Seasonal patterns** — strike volume shifts dramatically between summer (109k) and winter (30k)
+
+![Seasonal map](docs/screenshots/map_seasonal.png)
+
+**Species danger matrix** — frequency vs. damage rate; bubble size = avg repair cost
+
+![Species danger matrix](docs/screenshots/chart_danger_matrix.png)
+
+---
+
 ## Data Sources
 
 - **FAA Wildlife Strike Database** — public CSV export from [wildlife.faa.gov](https://wildlife.faa.gov). Every reported wildlife strike since 1990 (~280,000 records).
