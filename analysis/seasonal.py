@@ -44,7 +44,7 @@ def load_airport_stats(airport_parquet: Path) -> list[AirportStats]:
             seasonal_counts=seasonal,
             flyway=str(row.get("flyway") or "Unknown"),
             risk_score=float(row.get("risk_score") or 0.0),
-            damage_trend=float(row.get("damage_trend") or 0.0),
+            damage_trend=float(row["damage_trend"]) if row.get("damage_trend") is not None else None,
         ))
     return results
 

@@ -15,7 +15,7 @@ class AirportStats:
     seasonal_counts: dict[str, int]  # {"Spring": 42, "Summer": 18, ...}
     flyway: str
     risk_score: float            # 0.0 – 1.0 composite risk
-    damage_trend: float = 0.0   # linear slope of damage_rate per year (+ = worsening)
+    damage_trend: float | None = None  # linear slope of damage_rate per year; None = insufficient history
 
 
 @dataclass

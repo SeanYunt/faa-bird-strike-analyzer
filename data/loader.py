@@ -281,7 +281,9 @@ def _build_airport_summary(df: pl.DataFrame) -> pl.DataFrame:
         pl.col("has_damage").cast(pl.Float64).mean().alias("damage_rate"),
     ]
     if "cost_repairs" in df.columns:
-        agg_exprs.append(pl.col("cost_repairs").mean().alias("avg_cost"))
+        agg_exprs.append(
+            pl.col("cost_repairs").filter(pl.col("cost_repairs") > 0).mean().fill_null(0.0).alias("avg_cost")
+        )
     else:
         agg_exprs.append(pl.lit(0.0).alias("avg_cost"))
 
@@ -340,11 +342,10 @@ def _build_airport_summary(df: pl.DataFrame) -> pl.DataFrame:
     # Join per-airport damage trend slopes
     trend_df = _compute_trend_slopes(df)
     if trend_df.height > 0:
-        summary = summary.join(trend_df, on="airport_id", how="left").with_columns(
-            pl.col("damage_trend").fill_null(0.0)
-        )
+        # Left join: airports with insufficient history get null — distinguishable from a genuine 0.0 slope
+        summary = summary.join(trend_df, on="airport_id", how="left")
     else:
-        summary = summary.with_columns(pl.lit(0.0).alias("damage_trend"))
+        summary = summary.with_columns(pl.lit(None).cast(pl.Float64).alias("damage_trend"))
 
     return summary.sort("risk_score", descending=True)
 

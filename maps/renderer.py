@@ -222,7 +222,7 @@ def render_trend_map(
         raise ValueError("No airports with coordinates available.")
 
     # Only include airports with enough history to have a meaningful trend
-    trend_airports = [a for a in airports if a.damage_trend != 0.0]
+    trend_airports = [a for a in airports if a.damage_trend is not None]
 
     fig = plt.figure(figsize=(20, 9))
     gs = fig.add_gridspec(1, 2, width_ratios=[2.2, 1], wspace=0.08)
@@ -233,7 +233,7 @@ def render_trend_map(
     _draw_basemap(ax_map)
 
     # Airports with no trend data — plot in gray first
-    no_trend = [a for a in airports if a.damage_trend == 0.0]
+    no_trend = [a for a in airports if a.damage_trend is None]
     if no_trend:
         ax_map.scatter(
             [a.longitude for a in no_trend],
