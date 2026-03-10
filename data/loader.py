@@ -101,11 +101,15 @@ def preprocess(
     if "longitude" in strikes.columns:
         click.echo("Assigning migration flyways...")
         strikes = strikes.with_columns(
-            pl.struct(["longitude", "latitude"])
-            .map_elements(
-                lambda r: _assign_flyway(r["longitude"], r["latitude"]),
-                return_dtype=pl.String,
-            )
+            pl.when(pl.col("longitude").is_null())
+            .then(pl.lit("Unknown"))
+            .when(pl.col("longitude") <= -114.0)
+            .then(pl.lit("Pacific"))
+            .when(pl.col("longitude") <= -100.0)
+            .then(pl.lit("Central"))
+            .when(pl.col("longitude") <= -83.0)
+            .then(pl.lit("Mississippi"))
+            .otherwise(pl.lit("Atlantic"))
             .alias("flyway")
         )
     else:
@@ -186,18 +190,30 @@ def _parse_dates_and_season(df: pl.DataFrame) -> pl.DataFrame:
     df = df.with_columns([
         pl.col("date_parsed").dt.month().alias("month"),
         pl.col("date_parsed").dt.year().alias("year"),
-        pl.col("date_parsed").dt.month()
-        .map_elements(lambda m: SEASONS.get(m, "Unknown"), return_dtype=pl.String)
-        .alias("season"),
     ])
+    df = df.with_columns(
+        pl.when(pl.col("month").is_in([12, 1, 2])).then(pl.lit("Winter"))
+        .when(pl.col("month").is_in([3, 4, 5])).then(pl.lit("Spring"))
+        .when(pl.col("month").is_in([6, 7, 8])).then(pl.lit("Summer"))
+        .when(pl.col("month").is_in([9, 10, 11])).then(pl.lit("Fall"))
+        .otherwise(pl.lit("Unknown"))
+        .alias("season")
+    )
     return df
 
 
 def _add_damage_flag(df: pl.DataFrame) -> pl.DataFrame:
     if "damage_level" in df.columns:
+        no_damage = (
+            pl.col("damage_level").cast(pl.String).str.to_uppercase()
+            .is_in(["N", "NONE", "N/A", ""])
+        )
+        # Nulls mean damage is unknown — treat as no damage rather than inflating rates
         return df.with_columns(
-            (~pl.col("damage_level").cast(pl.String).str.to_uppercase()
-             .is_in(["N", "NONE", "N/A", ""])).alias("has_damage")
+            pl.when(pl.col("damage_level").is_null())
+            .then(pl.lit(False))
+            .otherwise(~no_damage)
+            .alias("has_damage")
         )
     if "indicated_damage" in df.columns:
         return df.with_columns(
@@ -210,32 +226,33 @@ def _add_damage_flag(df: pl.DataFrame) -> pl.DataFrame:
 def _join_coordinates(strikes: pl.DataFrame, airports: pl.DataFrame) -> pl.DataFrame:
     if "airport_id" not in strikes.columns:
         return strikes
-
-    # FAA uses 3-char codes (JFK); OurAirports ICAO uses K+code (KJFK)
-    # Build a lookup: both 3-char and 4-char -> lat/lon
-    coord_rows = []
-    if "ident" in airports.columns and "latitude" in airports.columns:
-        for row in airports.iter_rows(named=True):
-            ident = str(row.get("ident") or "").strip().upper()
-            lat = row.get("latitude")
-            lon = row.get("longitude")
-            if lat is None or lon is None:
-                continue
-            coord_rows.append({"key": ident, "lat": float(lat), "lon": float(lon)})
-            # Also register the 3-char version for US airports (strip leading K)
-            if len(ident) == 4 and ident.startswith("K"):
-                coord_rows.append({"key": ident[1:], "lat": float(lat), "lon": float(lon)})
-
-    if not coord_rows:
+    if "ident" not in airports.columns or "latitude" not in airports.columns:
         return strikes
 
-    coord_df = pl.DataFrame(coord_rows).unique(subset=["key"])
+    # FAA uses 3-char codes (JFK); OurAirports ICAO uses K+code (KJFK)
+    # Build lookup table with both 4-char and stripped 3-char keys — all vectorized
+    coords = (
+        airports.select(["ident", "latitude", "longitude"])
+        .drop_nulls()
+        .with_columns(pl.col("ident").cast(pl.String).str.to_uppercase())
+    )
+
+    # 3-char version for US airports: strip leading "K" from 4-char ICAO codes
+    us_3char = (
+        coords
+        .filter(
+            (pl.col("ident").str.len_chars() == 4) & pl.col("ident").str.starts_with("K")
+        )
+        .with_columns(pl.col("ident").str.slice(1))
+    )
+
+    coord_df = pl.concat([coords, us_3char]).unique(subset=["ident"])
 
     strikes = strikes.with_columns(
         pl.col("airport_id").cast(pl.String).str.to_uppercase().alias("_join_key")
     )
     result = strikes.join(
-        coord_df.rename({"key": "_join_key", "lat": "latitude", "lon": "longitude"}),
+        coord_df.rename({"ident": "_join_key"}),
         on="_join_key",
         how="left",
     ).drop("_join_key")

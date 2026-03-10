@@ -74,7 +74,7 @@ total_strikes = int(airports["total_strikes"].sum())
 total_airports = len(airports)
 avg_damage = float(
     (airports["damage_rate"] * airports["total_strikes"]).sum() / total_strikes
-)
+) if total_strikes > 0 else 0.0
 
 # ── Top KPI strip ──────────────────────────────────────────────────────────────
 k1, k2, k3, k4 = st.columns(4)
@@ -207,6 +207,11 @@ with tab_airport:
     )
 
     airport_labels = [label(r) for r in top_airports_df.iter_rows(named=True)]
+
+    if not airport_labels:
+        st.info("No airports with 50+ strikes found in the data.")
+        st.stop()
+
     selected_label = st.selectbox("Select airport", airport_labels)
     selected_id = selected_label.split(" — ")[0]
 
