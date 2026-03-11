@@ -308,6 +308,14 @@ with tab_species:
 
             max_cost = float(sp["avg_cost"].max() or 1) if "avg_cost" in sp.columns else 1
 
+            # Top nuisance species by strikes (blue quadrant) to label selectively
+            nuisance_strike_thresh = float(
+                sp.filter(
+                    (pl.col("total_strikes") >= med_strikes) &
+                    (pl.col("damage_rate") < med_damage)
+                )["total_strikes"].quantile(0.6) or med_strikes
+            )
+
             for row in sp.iter_rows(named=True):
                 s = row["total_strikes"]
                 d = row["damage_rate"]
@@ -316,16 +324,26 @@ with tab_species:
                 color  = quadrant_color(s, d)
                 ax.scatter(s, d * 100, s=bubble, color=color, alpha=0.65,
                            edgecolors="white", linewidths=0.5)
-                ax.annotate(
-                    row["species"],
-                    xy=(s, d * 100),
-                    fontsize=6,
-                    ha="center",
-                    va="bottom",
-                    color="#333333",
-                    xytext=(0, 4),
-                    textcoords="offset points",
+
+                high_s = s >= med_strikes
+                high_d = d >= med_damage
+                # Label: Critical always; Dangerous always; Nuisance only top by strikes; Minor skip
+                should_label = (
+                    (high_s and high_d) or                          # Critical
+                    (high_d and not high_s) or                      # Dangerous
+                    (high_s and not high_d and s >= nuisance_strike_thresh)  # top Nuisance
                 )
+                if should_label:
+                    ax.annotate(
+                        row["species"],
+                        xy=(s, d * 100),
+                        fontsize=6,
+                        ha="center",
+                        va="bottom",
+                        color="#333333",
+                        xytext=(0, 4),
+                        textcoords="offset points",
+                    )
 
             ax.set_xscale("log")
             ax.axvline(med_strikes, color="gray", linestyle="--", linewidth=0.8, alpha=0.6)
