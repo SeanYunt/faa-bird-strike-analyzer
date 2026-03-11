@@ -316,6 +316,16 @@ with tab_species:
                 color  = quadrant_color(s, d)
                 ax.scatter(s, d * 100, s=bubble, color=color, alpha=0.65,
                            edgecolors="white", linewidths=0.5)
+                ax.annotate(
+                    row["species"],
+                    xy=(s, d * 100),
+                    fontsize=6,
+                    ha="center",
+                    va="bottom",
+                    color="#333333",
+                    xytext=(0, 4),
+                    textcoords="offset points",
+                )
 
             ax.set_xscale("log")
             ax.axvline(med_strikes, color="gray", linestyle="--", linewidth=0.8, alpha=0.6)
