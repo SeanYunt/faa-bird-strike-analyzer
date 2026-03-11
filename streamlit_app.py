@@ -327,10 +327,11 @@ with tab_species:
 
                 high_s = s >= med_strikes
                 high_d = d >= med_damage
-                # Label: Critical always; Dangerous only if damage >= 20%; top Nuisance; Minor skip
+                # Label: Critical always; Dangerous only damage >= 25% and strikes >= 30;
+                # top Nuisance; Minor skip
                 should_label = (
                     (high_s and high_d) or                                      # Critical
-                    (high_d and not high_s and d >= 0.20) or                    # Dangerous, notable damage
+                    (high_d and not high_s and d >= 0.25 and s >= 30) or       # Dangerous, notable
                     (high_s and not high_d and s >= nuisance_strike_thresh)     # top Nuisance
                 )
                 if should_label:
