@@ -291,77 +291,79 @@ with tab_species:
         if len(sp) == 0:
             st.warning("No species meet the minimum strike threshold.")
         else:
+            import plotly.graph_objects as go
+
             med_strikes = float(sp["total_strikes"].median() or 1)
             med_damage  = float(sp["damage_rate"].median() or 0.1)
 
-            def quadrant_color(strikes, damage):
+            QUADRANT_COLORS = {
+                "Critical":  "#EF5350",
+                "Dangerous": "#9C27B0",
+                "Nuisance":  "#2196F3",
+                "Minor":     "#4CAF50",
+            }
+
+            def quadrant_label(strikes, damage):
                 high_s = strikes >= med_strikes
                 high_d = damage  >= med_damage
-                if high_s and high_d:  return "#EF5350"   # Critical
-                if high_d:             return "#9C27B0"   # Dangerous
-                if high_s:             return "#2196F3"   # Nuisance
-                return                        "#4CAF50"   # Minor
-
-            fig, ax = plt.subplots(figsize=(10, 6))
-            fig.patch.set_facecolor("#f5f5f5")
-            ax.set_facecolor("#f5f5f5")
+                if high_s and high_d: return "Critical"
+                if high_d:            return "Dangerous"
+                if high_s:            return "Nuisance"
+                return "Minor"
 
             max_cost = float(sp["avg_cost"].max() or 1) if "avg_cost" in sp.columns else 1
 
-            # Top nuisance species by strikes (blue quadrant) to label selectively
-            nuisance_strike_thresh = float(
-                sp.filter(
-                    (pl.col("total_strikes") >= med_strikes) &
-                    (pl.col("damage_rate") < med_damage)
-                )["total_strikes"].quantile(0.6) or med_strikes
-            )
-
+            # Build one trace per quadrant so the legend is clean
+            traces = {q: {"x": [], "y": [], "size": [], "text": []} for q in QUADRANT_COLORS}
             for row in sp.iter_rows(named=True):
-                s = row["total_strikes"]
-                d = row["damage_rate"]
+                s    = row["total_strikes"]
+                d    = row["damage_rate"]
                 cost = float(row.get("avg_cost") or 0)
-                bubble = 20 + (cost / max_cost) * 400 if max_cost > 0 else 30
-                color  = quadrant_color(s, d)
-                ax.scatter(s, d * 100, s=bubble, color=color, alpha=0.65,
-                           edgecolors="white", linewidths=0.5)
-
-                high_s = s >= med_strikes
-                high_d = d >= med_damage
-                # Label: Critical always; Dangerous only damage >= 25% and strikes >= 30;
-                # top Nuisance; Minor skip
-                should_label = (
-                    (high_s and high_d) or                                      # Critical
-                    (high_d and not high_s and d >= 0.25 and s >= 30) or       # Dangerous, notable
-                    (high_s and not high_d and s >= nuisance_strike_thresh)     # top Nuisance
+                q    = quadrant_label(s, d)
+                bubble = 8 + (cost / max_cost) * 40
+                hover = (
+                    f"<b>{row['species']}</b><br>"
+                    f"Strikes: {s:,}<br>"
+                    f"Damage rate: {d:.1%}<br>"
+                    f"Avg repair cost: ${cost:,.0f}"
                 )
-                if should_label:
-                    ax.annotate(
-                        row["species"],
-                        xy=(s, d * 100),
-                        fontsize=6,
-                        ha="center",
-                        va="bottom",
-                        color="#333333",
-                        xytext=(0, 4),
-                        textcoords="offset points",
-                    )
+                traces[q]["x"].append(s)
+                traces[q]["y"].append(d * 100)
+                traces[q]["size"].append(bubble)
+                traces[q]["text"].append(hover)
 
-            ax.set_xscale("log")
-            ax.axvline(med_strikes, color="gray", linestyle="--", linewidth=0.8, alpha=0.6)
-            ax.axhline(med_damage * 100, color="gray", linestyle="--", linewidth=0.8, alpha=0.6)
-            ax.set_xlabel("Total Strikes (log scale)")
-            ax.set_ylabel("Damage Rate (%)")
-            ax.set_title("Species Risk Profile", fontsize=12, pad=10)
+            fig = go.Figure()
+            for q, color in QUADRANT_COLORS.items():
+                t = traces[q]
+                fig.add_trace(go.Scatter(
+                    x=t["x"], y=t["y"],
+                    mode="markers",
+                    name=q,
+                    marker=dict(
+                        size=t["size"],
+                        color=color,
+                        opacity=0.7,
+                        line=dict(color="white", width=0.5),
+                        sizemode="area",
+                    ),
+                    hovertemplate="%{text}<extra></extra>",
+                    text=t["text"],
+                ))
 
-            legend_items = [
-                mpatches.Patch(color="#EF5350", label="Critical — common + damaging"),
-                mpatches.Patch(color="#9C27B0", label="Dangerous — rare but damaging"),
-                mpatches.Patch(color="#2196F3", label="Nuisance — common, rarely damaging"),
-                mpatches.Patch(color="#4CAF50", label="Minor — rare + low damage"),
-            ]
-            ax.legend(handles=legend_items, loc="upper left", fontsize=8)
-            st.pyplot(fig)
-            plt.close(fig)
+            fig.add_vline(x=med_strikes, line_dash="dash", line_color="gray", opacity=0.6)
+            fig.add_hline(y=med_damage * 100, line_dash="dash", line_color="gray", opacity=0.6)
+
+            fig.update_layout(
+                title="Species Risk Profile",
+                xaxis=dict(title="Total Strikes (log scale)", type="log"),
+                yaxis=dict(title="Damage Rate (%)"),
+                legend=dict(title="Quadrant", orientation="v"),
+                plot_bgcolor="#f5f5f5",
+                paper_bgcolor="#f5f5f5",
+                height=600,
+                hovermode="closest",
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
 st.divider()
-st.caption("Built with Polars · Matplotlib · Streamlit · FAA public data")
+st.caption("Built with Polars · Matplotlib · Plotly · Streamlit · FAA public data")
