@@ -353,11 +353,26 @@ with tab_species:
             fig.add_vline(x=med_strikes, line_dash="dash", line_color="gray", opacity=0.6)
             fig.add_hline(y=med_damage * 100, line_dash="dash", line_color="gray", opacity=0.6)
 
+            max_y = float(sp["damage_rate"].max() or 1) * 100 * 1.1
+
+            # Quadrant corner labels in paper coords (0=left/bottom, 1=right/top)
+            quadrant_annotations = [
+                dict(text="Critical", x=0.98, y=0.98, xref="paper", yref="paper",
+                     showarrow=False, font=dict(color="#EF5350", size=11), xanchor="right", yanchor="top"),
+                dict(text="Dangerous", x=0.02, y=0.98, xref="paper", yref="paper",
+                     showarrow=False, font=dict(color="#9C27B0", size=11), xanchor="left", yanchor="top"),
+                dict(text="Nuisance", x=0.98, y=0.02, xref="paper", yref="paper",
+                     showarrow=False, font=dict(color="#2196F3", size=11), xanchor="right", yanchor="bottom"),
+                dict(text="Minor", x=0.02, y=0.02, xref="paper", yref="paper",
+                     showarrow=False, font=dict(color="#4CAF50", size=11), xanchor="left", yanchor="bottom"),
+            ]
+
             fig.update_layout(
                 title="Species Risk Profile",
                 xaxis=dict(title="Total Strikes (log scale)", type="log"),
-                yaxis=dict(title="Damage Rate (%)"),
+                yaxis=dict(title="Damage Rate (%)", range=[0, max_y]),
                 legend=dict(title="Quadrant", orientation="v"),
+                annotations=quadrant_annotations,
                 plot_bgcolor="#f5f5f5",
                 paper_bgcolor="#f5f5f5",
                 height=600,
